@@ -1,3 +1,4 @@
+
 //#region src/utils.ts
 const postfixRE = /[?#].*$/;
 function cleanUrl(url) {
@@ -252,4 +253,19 @@ function makeRegexIdFilterToMatchWithQuery(input) {
 }
 
 //#endregion
-export { and, code, exactRegex, exclude, exprInterpreter, id, include, interpreter, interpreterImpl, makeIdFiltersToMatchWithQuery, moduleType, not, or, prefixRegex, queries, query };
+exports.and = and;
+exports.code = code;
+exports.exactRegex = exactRegex;
+exports.exclude = exclude;
+exports.exprInterpreter = exprInterpreter;
+exports.id = id;
+exports.include = include;
+exports.interpreter = interpreter;
+exports.interpreterImpl = interpreterImpl;
+exports.makeIdFiltersToMatchWithQuery = makeIdFiltersToMatchWithQuery;
+exports.moduleType = moduleType;
+exports.not = not;
+exports.or = or;
+exports.prefixRegex = prefixRegex;
+exports.queries = queries;
+exports.query = query;
