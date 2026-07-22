@@ -1,192 +1,311 @@
-// TypeScript Version: 3.0
+// Type definitions for commander
+// Original definitions by: Alan Agius <https://github.com/alan-agius4>, Marcelo Dezem <https://github.com/mdezem>, vvakame <https://github.com/vvakame>, Jules Randolph <https://github.com/sveinburne>
 
-/// <reference types="node" />
+///<reference types="node" />
 
-import * as fs from "fs";
-import { EventEmitter } from "events";
-import { Matcher } from 'anymatch';
+declare namespace commander {
 
-export class FSWatcher extends EventEmitter implements fs.FSWatcher {
-  options: WatchOptions;
+  interface CommanderError extends Error {
+    code: string;
+    exitCode: number;
+    message: string;
+    nestedError?: string;
+  }
+  type CommanderErrorConstructor = { new (exitCode: number, code: string, message: string): CommanderError };
 
-  /**
-   * Constructs a new FSWatcher instance with optional WatchOptions parameter.
-   */
-  constructor(options?: WatchOptions);
+  interface Option {
+    flags: string;
+    required: boolean; // A value must be supplied when the option is specified.
+    optional: boolean; // A value is optional when the option is specified.
+    mandatory: boolean; // The option must have a value after parsing, which usually means it must be specified on command line.
+    bool: boolean;
+    short?: string;
+    long: string;
+    description: string;
+  }
+  type OptionConstructor = { new (flags: string, description?: string): Option };
 
-  /**
-   * Add files, directories, or glob patterns for tracking. Takes an array of strings or just one
-   * string.
-   */
-  add(paths: string | ReadonlyArray<string>): this;
+  interface Command extends NodeJS.EventEmitter {
+    [key: string]: any; // options as properties
 
-  /**
-   * Stop watching files, directories, or glob patterns. Takes an array of strings or just one
-   * string.
-   */
-  unwatch(paths: string | ReadonlyArray<string>): this;
+    args: string[];
 
-  /**
-   * Returns an object representing all the paths on the file system being watched by this
-   * `FSWatcher` instance. The object's keys are all the directories (using absolute paths unless
-   * the `cwd` option was used), and the values are arrays of the names of the items contained in
-   * each directory.
-   */
-  getWatched(): {
-    [directory: string]: string[];
-  };
+    /**
+     * Set the program version to `str`. 
+     *
+     * This method auto-registers the "-V, --version" flag
+     * which will print the version number when passed.
+     * 
+     * You can optionally supply the  flags and description to override the defaults.
+     */
+    version(str: string, flags?: string, description?: string): Command;
 
-  /**
-   * Removes all listeners from watched files.
-   */
-  close(): Promise<void>;
+    /**
+     * Define a command, implemented using an action handler.
+     * 
+     * @remarks
+     * The command description is supplied using `.description`, not as a parameter to `.command`.
+     * 
+     * @example
+     * ```ts
+     *  program
+     *    .command('clone <source> [destination]')
+     *    .description('clone a repository into a newly created directory')
+     *    .action((source, destination) => {
+     *      console.log('clone command called');
+     *    });
+     * ```
+     * 
+     * @param nameAndArgs - command name and arguments, args are  `<required>` or `[optional]` and last may also be `variadic...`
+     * @param opts - configuration options
+     * @returns new command
+     */
+    command(nameAndArgs: string, opts?: CommandOptions): Command;
+    /**
+     * Define a command, implemented in a separate executable file.
+     * 
+     * @remarks
+     * The command description is supplied as the second parameter to `.command`.
+     * 
+     * @example
+     * ```ts
+     *  program
+     *    .command('start <service>', 'start named service')
+     *    .command('stop [service]', 'stop named serice, or all if no name supplied');
+     * ```
+     * 
+     * @param nameAndArgs - command name and arguments, args are  `<required>` or `[optional]` and last may also be `variadic...`
+     * @param description - description of executable command
+     * @param opts - configuration options
+     * @returns top level command for chaining more command definitions
+     */
+    command(nameAndArgs: string, description: string, opts?: commander.CommandOptions): Command;
 
-  on(event: 'add'|'addDir'|'change', listener: (path: string, stats?: fs.Stats) => void): this;
+    /**
+     * Define argument syntax for the top-level command.
+     *
+     * @returns Command for chaining
+     */
+    arguments(desc: string): Command;
 
-  on(event: 'all', listener: (eventName: 'add'|'addDir'|'change'|'unlink'|'unlinkDir', path: string, stats?: fs.Stats) => void): this;
+    /**
+    * Parse expected `args`.
+     *
+     * For example `["[type]"]` becomes `[{ required: false, name: 'type' }]`.
+     *
+     * @returns Command for chaining
+     */
+     parseExpectedArgs(args: string[]): Command;
 
-  /**
-   * Error occurred
-   */
-  on(event: 'error', listener: (error: Error) => void): this;
+    /**
+     * Register callback to use as replacement for calling process.exit.
+     */
+    exitOverride(callback?: (err: CommanderError) => never|void): Command;
 
-  /**
-   * Exposes the native Node `fs.FSWatcher events`
-   */
-  on(event: 'raw', listener: (eventName: string, path: string, details: any) => void): this;
+    /**
+     * Register callback `fn` for the command.
+     *
+     * @example
+     *      program
+     *        .command('help')
+     *        .description('display verbose help')
+     *        .action(function() {
+     *           // output help here
+     *        });
+     *
+     * @returns Command for chaining
+     */
+    action(fn: (...args: any[]) => void | Promise<void>): Command;
 
-  /**
-   * Fires when the initial scan is complete
-   */
-  on(event: 'ready', listener: () => void): this;
+    /**
+     * Define option with `flags`, `description` and optional
+     * coercion `fn`.
+     *
+     * The `flags` string should contain both the short and long flags,
+     * separated by comma, a pipe or space. The following are all valid
+     * all will output this way when `--help` is used.
+     *
+     *    "-p, --pepper"
+     *    "-p|--pepper"
+     *    "-p --pepper"
+     *
+     * @example
+     *     // simple boolean defaulting to false
+     *     program.option('-p, --pepper', 'add pepper');
+     *
+     *     --pepper
+     *     program.pepper
+     *     // => Boolean
+     *
+     *     // simple boolean defaulting to true
+     *     program.option('-C, --no-cheese', 'remove cheese');
+     *
+     *     program.cheese
+     *     // => true
+     *
+     *     --no-cheese
+     *     program.cheese
+     *     // => false
+     *
+     *     // required argument
+     *     program.option('-C, --chdir <path>', 'change the working directory');
+     *
+     *     --chdir /tmp
+     *     program.chdir
+     *     // => "/tmp"
+     *
+     *     // optional argument
+     *     program.option('-c, --cheese [type]', 'add cheese [marble]');
+     *
+     * @returns Command for chaining
+     */
+    option(flags: string, description?: string, fn?: ((arg1: any, arg2: any) => void) | RegExp, defaultValue?: any): Command;
+    option(flags: string, description?: string, defaultValue?: any): Command;
 
-  on(event: 'unlink'|'unlinkDir', listener: (path: string) => void): this;
+    /**
+     * Define a required option, which must have a value after parsing. This usually means
+     * the option must be specified on the command line. (Otherwise the same as .option().)
+     *
+     * The `flags` string should contain both the short and long flags, separated by comma, a pipe or space.
+     */
+    requiredOption(flags: string, description?: string, fn?: ((arg1: any, arg2: any) => void) | RegExp, defaultValue?: any): Command;
+    requiredOption(flags: string, description?: string, defaultValue?: any): Command;
 
-  on(event: string, listener: (...args: any[]) => void): this;
 
-  ref(): this;
-  
-  unref(): this;
+    /**
+     * Whether to store option values as properties on command object,
+     * or store separately (specify false). In both cases the option values can be accessed using .opts().
+     *
+     * @return Command for chaining
+     */
+    storeOptionsAsProperties(value?: boolean): Command;
+
+    /**
+     * Whether to pass command to action handler,
+     * or just the options (specify false).
+     * 
+     * @return Command for chaining
+     */
+    passCommandToAction(value?: boolean): Command;
+
+    /**
+     * Allow unknown options on the command line.
+     *
+     * @param [arg] if `true` or omitted, no error will be thrown for unknown options.
+     * @returns Command for chaining
+     */
+    allowUnknownOption(arg?: boolean): Command;
+
+    /**
+     * Parse `argv`, setting options and invoking commands when defined.
+     *
+     * @returns Command for chaining
+     */
+    parse(argv: string[]): Command;
+
+    /**
+     * Parse `argv`, setting options and invoking commands when defined.
+     * 
+     * Use parseAsync instead of parse if any of your action handlers are async. Returns a Promise.
+     *
+     * @returns Promise
+     */
+    parseAsync(argv: string[]): Promise<any>;
+
+    /**
+     * Parse options from `argv` returning `argv` void of these options.
+     */
+    parseOptions(argv: string[]): commander.ParseOptionsResult;
+
+    /**
+     * Return an object containing options as key-value pairs
+     */
+    opts(): { [key: string]: any };
+
+    /**
+     * Set the description.
+     * 
+     * @returns Command for chaining
+     */
+    description(str: string, argsDescription?: {[argName: string]: string}): Command;
+    /**
+     * Get the description.
+     */
+    description(): string;
+
+    /**
+     * Set an alias for the command.
+     * 
+     * @returns Command for chaining
+     */
+    alias(alias: string): Command;
+    /**
+     * Get alias for the command.
+     */
+    alias(): string;
+
+    /**
+     * Set the command usage.
+     * 
+     * @returns Command for chaining
+     */
+    usage(str: string): Command;
+    /**
+     * Get the command usage.
+     */
+    usage(): string;
+
+    /**
+     * Set the name of the command.
+     * 
+     * @returns Command for chaining
+     */
+    name(str: string): Command;
+    /**
+     * Get the name of the command.
+     */
+    name(): string;
+
+    /**
+     * Output help information for this command.
+     *
+     * When listener(s) are available for the helpLongFlag
+     * those callbacks are invoked.
+     */
+    outputHelp(cb?: (str: string) => string): void;
+
+    /**
+     * You can pass in flags and a description to override the help
+     * flags and help description for your command.
+     */
+    helpOption(flags?: string, description?: string): Command;
+
+    /** 
+     * Output help information and exit.
+     */
+    help(cb?: (str: string) => string): never;
+  }
+  type CommandConstructor = { new (name?: string): Command };
+
+
+    interface CommandOptions {
+        noHelp?: boolean;
+        isDefault?: boolean;
+        executableFile?: string;
+    }
+
+    interface ParseOptionsResult {
+        args: string[];
+        unknown: string[];
+    }
+
+    interface CommanderStatic extends Command {
+        Command: CommandConstructor;
+        Option: OptionConstructor;
+        CommanderError:CommanderErrorConstructor;
+      }
+
 }
 
-export interface WatchOptions {
-  /**
-   * Indicates whether the process should continue to run as long as files are being watched. If
-   * set to `false` when using `fsevents` to watch, no more events will be emitted after `ready`,
-   * even if the process continues to run.
-   */
-  persistent?: boolean;
-
-  /**
-   * ([anymatch](https://github.com/micromatch/anymatch)-compatible definition) Defines files/paths to
-   * be ignored. The whole relative or absolute path is tested, not just filename. If a function
-   * with two arguments is provided, it gets called twice per path - once with a single argument
-   * (the path), second time with two arguments (the path and the
-   * [`fs.Stats`](https://nodejs.org/api/fs.html#fs_class_fs_stats) object of that path).
-   */
-  ignored?: Matcher;
-
-  /**
-   * If set to `false` then `add`/`addDir` events are also emitted for matching paths while
-   * instantiating the watching as chokidar discovers these file paths (before the `ready` event).
-   */
-  ignoreInitial?: boolean;
-
-  /**
-   * When `false`, only the symlinks themselves will be watched for changes instead of following
-   * the link references and bubbling events through the link's path.
-   */
-  followSymlinks?: boolean;
-
-  /**
-   * The base directory from which watch `paths` are to be derived. Paths emitted with events will
-   * be relative to this.
-   */
-  cwd?: string;
-
-  /**
-   *  If set to true then the strings passed to .watch() and .add() are treated as literal path
-   *  names, even if they look like globs. Default: false.
-   */
-  disableGlobbing?: boolean;
-
-  /**
-   * Whether to use fs.watchFile (backed by polling), or fs.watch. If polling leads to high CPU
-   * utilization, consider setting this to `false`. It is typically necessary to **set this to
-   * `true` to successfully watch files over a network**, and it may be necessary to successfully
-   * watch files in other non-standard situations. Setting to `true` explicitly on OS X overrides
-   * the `useFsEvents` default.
-   */
-  usePolling?: boolean;
-
-  /**
-   * Whether to use the `fsevents` watching interface if available. When set to `true` explicitly
-   * and `fsevents` is available this supercedes the `usePolling` setting. When set to `false` on
-   * OS X, `usePolling: true` becomes the default.
-   */
-  useFsEvents?: boolean;
-
-  /**
-   * If relying upon the [`fs.Stats`](https://nodejs.org/api/fs.html#fs_class_fs_stats) object that
-   * may get passed with `add`, `addDir`, and `change` events, set this to `true` to ensure it is
-   * provided even in cases where it wasn't already available from the underlying watch events.
-   */
-  alwaysStat?: boolean;
-
-  /**
-   * If set, limits how many levels of subdirectories will be traversed.
-   */
-  depth?: number;
-
-  /**
-   * Interval of file system polling.
-   */
-  interval?: number;
-
-  /**
-   * Interval of file system polling for binary files. ([see list of binary extensions](https://gi
-   * thub.com/sindresorhus/binary-extensions/blob/master/binary-extensions.json))
-   */
-  binaryInterval?: number;
-
-  /**
-   *  Indicates whether to watch files that don't have read permissions if possible. If watching
-   *  fails due to `EPERM` or `EACCES` with this set to `true`, the errors will be suppressed
-   *  silently.
-   */
-  ignorePermissionErrors?: boolean;
-
-  /**
-   * `true` if `useFsEvents` and `usePolling` are `false`). Automatically filters out artifacts
-   * that occur when using editors that use "atomic writes" instead of writing directly to the
-   * source file. If a file is re-added within 100 ms of being deleted, Chokidar emits a `change`
-   * event rather than `unlink` then `add`. If the default of 100 ms does not work well for you,
-   * you can override it by setting `atomic` to a custom value, in milliseconds.
-   */
-  atomic?: boolean | number;
-
-  /**
-   * can be set to an object in order to adjust timing params:
-   */
-  awaitWriteFinish?: AwaitWriteFinishOptions | boolean;
-}
-
-export interface AwaitWriteFinishOptions {
-  /**
-   * Amount of time in milliseconds for a file size to remain constant before emitting its event.
-   */
-  stabilityThreshold?: number;
-
-  /**
-   * File size polling interval.
-   */
-  pollInterval?: number;
-}
-
-/**
- * produces an instance of `FSWatcher`.
- */
-export function watch(
-  paths: string | ReadonlyArray<string>,
-  options?: WatchOptions
-): FSWatcher;
+declare const commander: commander.CommanderStatic;
+export = commander;
