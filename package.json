@@ -1,27 +1,43 @@
 {
-  "author": "Felix Geisendörfer <felix@debuggable.com> (http://debuggable.com/)",
-  "contributors": [
-    "Mike Atkins <apeherder@gmail.com>"
+  "name": "electron-to-chromium",
+  "version": "1.5.394",
+  "description": "Provides a list of electron-to-chromium version mappings",
+  "main": "index.js",
+  "files": [
+    "versions.js",
+    "full-versions.js",
+    "chromium-versions.js",
+    "full-chromium-versions.js",
+    "versions.json",
+    "full-versions.json",
+    "chromium-versions.json",
+    "full-chromium-versions.json",
+    "LICENSE"
   ],
-  "name": "delayed-stream",
-  "description": "Buffers events from a stream until you are ready to handle them.",
-  "license": "MIT",
-  "version": "1.0.0",
-  "homepage": "https://github.com/felixge/node-delayed-stream",
+  "scripts": {
+    "build": "node build.mjs",
+    "update": "node automated-update.js",
+    "test": "nyc ava --verbose",
+    "report": "nyc report --reporter=text-lcov > coverage.lcov"
+  },
   "repository": {
     "type": "git",
-    "url": "git://github.com/felixge/node-delayed-stream.git"
+    "url": "git+https://github.com/Kilian/electron-to-chromium.git"
   },
-  "main": "./lib/delayed_stream",
-  "engines": {
-    "node": ">=0.4.0"
-  },
-  "scripts": {
-    "test": "make test"
-  },
-  "dependencies": {},
+  "keywords": [
+    "electron",
+    "chrome",
+    "chromium",
+    "browserslist",
+    "browserlist"
+  ],
+  "author": "Kilian Valkhof",
+  "license": "ISC",
   "devDependencies": {
-    "fake": "0.2.0",
-    "far": "0.0.1"
+    "ava": "^7.0.0",
+    "compare-versions": "^6.1.1",
+    "node-fetch": "^3.3.2",
+    "nyc": "^18.0.0",
+    "shelljs": "^0.10.0"
   }
 }
